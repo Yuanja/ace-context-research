@@ -32,6 +32,7 @@ Persistent research wiki for Agentic Context Engineering (ACE) and adjacent cont
 - [[concepts/addressable-recall-compaction]]
 - [[concepts/context-collapse]]
 - [[concepts/evaluation-monitoring-scale]]
+- [[concepts/research-source-taxonomy]]
 - [[concepts/reasoning-intensive-retrieval]]
 
 ## Comparisons

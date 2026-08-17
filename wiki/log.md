@@ -30,3 +30,15 @@ Pages touched:
 Key synthesis: BRIGHT is not directly comparable to ACE/ACM/ARC, but it is a strong candidate evaluation surface for an ACE+ACM+ARC retrieval agent. Top methods mostly win through intent transformation, reasoning-tuned embeddings, reranking/fusion, or agentic query loops.
 
 Unresolved questions: no ACE/ACM/ARC paper reports BRIGHT results; some leaderboard metadata around long-document metrics/dates is inconsistent; several top method descriptions are self-reported project pages rather than papers.
+
+## [2026-08-16] maintenance | Source taxonomy and monitor rubric
+
+Added a source taxonomy page and updated the monitor instructions after James asked how GNoME and Nature should be interpreted.
+
+Pages touched:
+
+- [[concepts/research-source-taxonomy]]
+
+Key rule: Nature is a venue/publisher source category, while GNoME is a model/project and must be cited through supporting primary evidence such as a paper, dataset, repo, or lab page.
+
+Monitor update: future runs must classify candidates as paper, venue/publisher, benchmark/dataset, model/project, implementation, commentary, or news before ingesting.

@@ -23,6 +23,8 @@ This project is an LLM-maintained research wiki for ACE: Agentic Context Enginee
 - Claims about benchmark gains must include the exact benchmark and tested setting.
 - Avoid wording like "solves memory" or "proves superiority." Use "reports", "under tested settings", or "suggests".
 - If a claim comes from a blog, label it as commentary unless independently confirmed by the paper or repo.
+- Label source type explicitly. A publisher/journal such as Nature is a publication venue; a benchmark such as BRIGHT is an evaluation artifact; a model/project such as GNoME is a research object, not a source by itself.
+- For Nature-family material, distinguish peer-reviewed journal articles from news, commentary, editorials, press releases, and broader Nature Portfolio journals.
 
 ## Ingest Workflow
 
@@ -39,12 +41,13 @@ The twice-daily monitor should:
 
 1. Search arXiv and the web for new ACE/context-engineering/context-management work.
 2. Prioritize credible sources: arXiv, conference pages, official repos, Google/DeepMind/OpenAI/Anthropic/Stanford/Berkeley/SambaNova/LangChain/Letta/mem0 engineering posts, and reputable technical news.
-3. Download PDFs for new papers when available.
-4. Update the wiki only after reading the source.
-5. Run a skeptical self-review pass before alerting James.
-6. Write a dated run report under `reports/runs/` that lets James review the activity, decisions, accepted/rejected sources, files changed, and skepticism pass.
-7. Rebuild `site/index.html` with `node tools/build-viewer.js`.
-8. Alert only on genuinely interesting items: new papers, substantial code releases, strong evaluations, surprising failures, or techniques that affect ACE evaluation/scale/monitoring.
+3. Classify each candidate as source, venue, benchmark, model/project, dataset, implementation, commentary, or news before ingesting.
+4. Download PDFs for new papers when available.
+5. Update the wiki only after reading the source.
+6. Run a skeptical self-review pass before alerting James.
+7. Write a dated run report under `reports/runs/` that lets James review the activity, decisions, accepted/rejected sources, files changed, and skepticism pass.
+8. Rebuild `site/index.html` with `node tools/build-viewer.js`.
+9. Alert only on genuinely interesting items: new papers, substantial code releases, strong evaluations, surprising failures, or techniques that affect ACE evaluation/scale/monitoring.
 
 ## Self-Review Checklist
 
