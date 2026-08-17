@@ -1,0 +1,11 @@
+{
+  "created": "2026-08-16",
+  "cron_job_id": "3978b88f-0e21-4727-a2f1-414694caf22c",
+  "schedule": "0 8,17 * * * America/Los_Angeles",
+  "last_run": null,
+  "seen": [
+    "arxiv:2510.04618",
+    "arxiv:2607.23809",
+    "arxiv:2607.25066"
+  ]
+}
