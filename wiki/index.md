@@ -17,6 +17,7 @@ Persistent research wiki for Agentic Context Engineering (ACE) and adjacent cont
 ## Sources
 
 - [[sources/2407.12883-bright]] - Reasoning-intensive retrieval benchmark.
+- [[sources/2506.13651-xbench-agent-productivity]] - Profession-aligned AI agent productivity benchmark.
 - [[sources/bright-leaderboard-top-methods]] - Top BRIGHT leaderboard methods snapshot.
 - [[sources/2510.04618-agentic-context-engineering]] - ACE paper, ICLR 2026.
 - [[sources/2607.23809-agentic-context-management]] - ACM paper, fresh arXiv preprint.
@@ -27,6 +28,7 @@ Persistent research wiki for Agentic Context Engineering (ACE) and adjacent cont
 
 ## Concepts
 
+- [[concepts/agent-productivity-benchmarks]]
 - [[concepts/agentic-context-engineering]]
 - [[concepts/agentic-context-management]]
 - [[concepts/addressable-recall-compaction]]

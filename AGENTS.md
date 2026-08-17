@@ -42,12 +42,13 @@ The twice-daily monitor should:
 1. Search arXiv and the web for new ACE/context-engineering/context-management work.
 2. Prioritize credible sources: arXiv, conference pages, official repos, Google/DeepMind/OpenAI/Anthropic/Stanford/Berkeley/SambaNova/LangChain/Letta/mem0 engineering posts, and reputable technical news.
 3. Classify each candidate as source, venue, benchmark, model/project, dataset, implementation, commentary, or news before ingesting.
-4. Download PDFs for new papers when available.
-5. Update the wiki only after reading the source.
-6. Run a skeptical self-review pass before alerting James.
-7. Write a dated run report under `reports/runs/` that lets James review the activity, decisions, accepted/rejected sources, files changed, and skepticism pass.
-8. Rebuild `site/index.html` with `node tools/build-viewer.js`.
-9. Alert only on genuinely interesting items: new papers, substantial code releases, strong evaluations, surprising failures, or techniques that affect ACE evaluation/scale/monitoring.
+4. Maintain a separate evaluation-surface search lane for benchmarks that can test long-horizon agents, deep research, professional productivity, retrieval reasoning, browser use, and context governance. Do not wait for the user to name a benchmark before mapping this landscape.
+5. Download PDFs for new papers when available.
+6. Update the wiki only after reading the source.
+7. Run a skeptical self-review pass before alerting James.
+8. Write a dated run report under `reports/runs/` that lets James review the activity, decisions, accepted/rejected sources, files changed, and skepticism pass.
+9. Rebuild `site/index.html` with `node tools/build-viewer.js`.
+10. Alert only on genuinely interesting items: new papers, substantial code releases, strong evaluations, surprising failures, or techniques that affect ACE evaluation/scale/monitoring.
 
 ## Self-Review Checklist
 

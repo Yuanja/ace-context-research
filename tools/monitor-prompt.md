@@ -16,6 +16,7 @@ Workflow:
 1. Read `AGENTS.md`, `wiki/index.md`, `wiki/log.md`, `state/monitor-state.json`, and `reports/latest-interesting.md`.
 2. Search credible sources for new work since the last run:
    - arXiv queries: `"Agentic Context Engineering"`, `"context engineering" LLM agents`, `"context management" LLM agents`, `"long horizon" agent context`, `"context compaction" LLM agents`, `"agent memory" benchmark`.
+   - Evaluation-surface queries: `"agent productivity benchmark"`, `"professional workflow" AI agent benchmark`, `"deep research" agent benchmark`, `"browser agent" benchmark`, `"web research agent" benchmark`, `"context memory" agent benchmark`, `"xbench" AI agent`, `"GAIA" AI agent benchmark`, `"BrowseComp" deep research`, `"DeepResearch Bench"`.
    - Web queries for official repos/blogs and credible tech analysis.
    - Nature/Nature Portfolio, Science, and major conference/journal sources only when they have primary technical material or link to it.
 3. Classify each candidate before ingesting: paper, venue/publisher, benchmark/dataset, model/project, implementation, commentary, or news. Do not treat a model/project name such as GNoME as a source; cite the supporting paper, dataset, repo, or lab page.
@@ -33,6 +34,7 @@ Run report requirements:
 - Candidate sources found.
 - Source classification decisions, including whether each candidate is primary evidence, venue/publisher metadata, benchmark/dataset, implementation, commentary, or news.
 - Sources accepted, rejected, or deferred, with reasons.
+- Evaluation-surface coverage: did the run check for new benchmarks or benchmark results that could evaluate ACE/context-management systems?
 - PDFs or pages downloaded/fetched.
 - Files changed.
 - Key activity decisions, especially why something was or was not interesting.

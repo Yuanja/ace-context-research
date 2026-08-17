@@ -42,3 +42,17 @@ Pages touched:
 Key rule: Nature is a venue/publisher source category, while GNoME is a model/project and must be cited through supporting primary evidence such as a paper, dataset, repo, or lab page.
 
 Monitor update: future runs must classify candidates as paper, venue/publisher, benchmark/dataset, model/project, implementation, commentary, or news before ingesting.
+
+## [2026-08-16] ingest | xbench and benchmark-discovery gap
+
+Ingested xbench after James pointed out that it should have been surfaced proactively as an adjacent benchmark for ACE/context-management evaluation.
+
+Pages touched:
+
+- [[sources/2506.13651-xbench-agent-productivity]]
+- [[concepts/agent-productivity-benchmarks]]
+- [[concepts/evaluation-monitoring-scale]]
+
+Key synthesis: xbench is not a context-management method, but it is a strong evaluation surface because it measures professional agent productivity in recruitment and marketing workflows. This is directly relevant to whether ACE-style context governance improves useful work rather than only isolated retrieval or long-context scores.
+
+Process correction: the monitor now has an explicit evaluation-surface lane for agent productivity, deep research, browser/web-agent, retrieval-reasoning, and context-memory benchmarks. The earlier search scope was too method-centric and waited for James to name xbench.

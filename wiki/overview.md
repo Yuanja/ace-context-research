@@ -29,3 +29,7 @@ The interesting axis is not just compression quality. It is **context governance
 ## BRIGHT Connection
 
 BRIGHT is now tracked as a likely evaluation target for ACE-style context systems. It does not evaluate ACE directly; it evaluates reasoning-intensive retrieval. The useful link is that BRIGHT's top methods increasingly rely on query intent distillation, reasoning-specialized embedding, reranking, fusion, or agentic search. Those are exactly the kinds of strategies an ACE playbook could learn, while ACM/ARC could preserve long retrieval trajectories and exact search evidence.
+
+## xbench Connection
+
+xbench is now tracked as an agent-productivity evaluation surface. It is not an ACE method, but it is highly relevant because it tests whether agents can perform professional workflows such as recruitment and marketing research with useful outputs, source discipline, and hallucination control. This is closer to the practical question ACE must answer: does better context governance improve real work, or only benchmark-specific success?
