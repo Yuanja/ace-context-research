@@ -6,6 +6,16 @@
   "seen": [
     "arxiv:2510.04618",
     "arxiv:2607.23809",
-    "arxiv:2607.25066"
+    "arxiv:2607.25066",
+    "arxiv:2407.12883",
+    "bright:mira-reasoning-retrieval",
+    "bright:inf-x-retriever",
+    "bright:rakanembed4b",
+    "bright:nvidia-nemo-agentic-retrieval",
+    "arxiv:2508.07995",
+    "bright:bge-reasoner-0928",
+    "arxiv:2510.08252",
+    "arxiv:2509.24869",
+    "arxiv:2508.07050"
   ]
 }

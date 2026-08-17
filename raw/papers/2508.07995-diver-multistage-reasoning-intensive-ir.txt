@@ -1,0 +1,768 @@
+
+
+--- PAGE 1 ---
+DIVER: A Multi-Stage Approach for Reasoning-intensive Information
+Retrieval
+Duolin Sun1, Meixiu Long 12∗, Dan Yang1†, Junjie Wang1,Yecheng Luo1, Yue Shen1, Jian
+Wang1, Hualei Zhou 1, Chunxiao Guo 1, Peng Wei1, Jiahai Wang2, Jinjie Gu 1
+1Ant Group, Hangzhou, China 2Sun Yat-sen University, Guangzhou, China
+{longmx7}@mail2.sysu.edu.cn,{sunduolin.sdl, luoyin.yd}@antgroup.com
+Abstract
+Retrieval-augmented generation has achieved strong performance on knowledge-
+intensive tasks where query-document relevance can be identified through direct
+lexical or semantic matches. However, many real-world queries involve abstract
+reasoning, analogical thinking, or multi-step inference, which existing retrievers
+often struggle to capture. To address this challenge, we presentDIVER, a re-
+trieval pipeline designed for reasoning-intensive information retrieval. It consists
+of four components. The document preprocessing stage enhances readability and
+preserves content by cleaning noisy texts and segmenting long documents. The
+query expansion stage leverages large language models to iteratively refine user
+queries with explicit reasoning and evidence from retrieved documents. The re-
+trieval stage employs a model fine-tuned on synthetic data spanning medical and
+mathematical domains, along with hard negatives, enabling effective handling of
+reasoning-intensive queries. Finally, the reranking stage combines pointwise and
+listwise strategies to produce both fine-grained and globally consistent rankings.
+On the BRIGHT benchmark, DIVER achieves state-of-the-art nDCG@10 scores
+of 46.8 overall and 31.9 on original queries, consistently outperforming com-
+petitive reasoning-aware models.These results demonstrate the effectiveness of
+reasoning-aware retrieval strategies in complex real-world tasks.
+Code:https://github.com/AQ-MedAI/Diver
+Model: https://huggingface.co/AQ-MedAI/Diver-Retriever-4B-1020 ,
+https://huggingface.co/AQ-MedAI/Diver-GroupRank-32B
+27.2
+Qwen1.5-7B+InteRank-3BDIVER-V3
+46.8
+DIVER-V2
+ReasonRank
++RaDerXRR2RaDeR+Qwen
+ReasonIR+Rank-R1
+ReasonIRTongSearchReasonIR+RerankerJudgeRankSeed1.5-Embedding
+45.840.840.339.238.838.336.935.827.4
+Jataware
+LatticeHierarchical
+42.1
+BGE-Reasoner-0928
+46.4
+DIVER-V1
+41.6
+Figure 1: DIVER achieves state-of-the-art performance on BRIGHT benchmark.
+∗Work done during the internship at Ant Group.
+†Corresponding author
+1
+arXiv:2508.07995v5  [cs.IR]  2 Apr 2026
+
+
+--- PAGE 2 ---
+1 Introduction
+Retrieval-augmented generation (RAG) has been widely applied in knowledge-intensive tasks such as
+factual question answering (Wang et al., 2023; Gan et al., 2024; Jiao et al., 2025; Tan et al., 2025; Gan et al.,
+2025). In these tasks, relevant documents that directly address the query can often be retrieved through
+simple lexical or semantic matching. However, relevance is not always established through surface-level
+similarity. In some cases, it arises from deeper and more abstract relationships, such as shared reasoning
+patterns or analogous conceptual structures. Real-world queries are often complex and require more than
+superficial similarity to identify relevant information. For example, an economist may seek a case study
+that illustrates the same economic principle as another, or a programmer may aim to resolve an error by
+finding documentation that explains the corresponding syntax. In such cases, effective retrieval demands
+reasoning beyond lexical or embedding-based similarity.
+To better evaluate retrieval models under such challenging conditions, the BRIGHT benchmark (Su
+et al., 2025) was introduced and has gained significant attention. It consists of 1,384 real-world queries
+collected from domains including economics, psychology, mathematics, and programming, all sourced
+from authentic human-generated data. Unlike earlier rag benchmarks such as BEIR (Thakur et al., 2021),
+PRGB Tan et al. (2025) MTEB (Muennighoff et al., 2023), which mainly target fact-based queries commonly
+derived from search engines and resolved through direct keyword or embedding-based matching,
+BRIGHT focuses on reasoning-intensive retrieval. The relevance between queries and documents in
+BRIGHT often involves implicit connections that require deliberate multi-step reasoning.
+In this work, we proposeDIVER( Deep reasoning retrieval and reranking), a retrieval pipeline composed
+of four main components: document preprocessing, document-interactive query expansion, reasoning-
+enhanced retrieval, and hybrid pointwise-listwise reranking. The first stage addresses document quality.
+Many of the provided documents suffer from poor readability, with issues such as excessive blank lines
+and truncated sentences. To improve input quality, the documents are cleaned. Additionally, a subset
+of documents exceeds the 16k token limit of the encoder. Rather than truncating them, which risks
+information loss, the documents are rechunked into segments of up to 4k tokens. This preprocessed
+version is referred to asDIVER-DChunk. The second component,DIVER-QExpand, utilizes an explicit
+reasoning chain generated by a large language model (LLM) to iteratively expand and refine the user
+query. Through multiple rounds of interaction with retrieved documents, the query is dynamically
+updated based on newly retrieved evidence, enabling diverse and context-aware interpretations of the
+original query. The third component focuses on reasoning-intensive retrieval. Existing retrievers, typically
+trained on datasets with short, fact-based queries, struggle with tasks requiring complex reasoning, as
+seen in benchmarks like BRIGHT. To address this, we construct synthetic training data by combining
+medical, coding, and mathematical domains, along with hard negative documents. This data is used to
+fine-tune Qwen3-Embedding-4B (Zhang et al., 2025b) under a contrastive learning objective, resulting in
+a retriever specifically adapted to complex reasoning, termed asDIVER-Retriever. To further enhance
+retrieval quality, relevance scores from this retriever are interpolated with BM25 scores, capturing both
+deep reasoning and surface-level similarities. The final component,DIVER-Rerank, performs pointwise
+reranking of retrieved documents. An off-the-shelf LLM assigns each document an integer helpfulness
+score (e.g., from 0 to 10). As LLM-generated scores often produce ties, they are interpolated with the
+retrieval scores to yield more fine-grained and discriminative rankings. In addition, DIVER-Rerank
+integrates the pointwise reranker with a listwise reranker, capturing both local relevance and a holistic
+ranking perspective.
+Comprehensive experiments are conducted on the BRIGHT benchmark. Experimental results show
+that DIVER achieved an improved nDCG@10 of 46.8, surpassing the BGE-Reasoner and establishing a
+new SOTA. When using only the original queries, DIVER obtains an nDCG@10 of 31.9, outperforming
+strong reasoning-intensive baselines including Seed1.5-Embedding1, ReasonIR (Shao et al., 2025), and
+RaDeR (Das et al., 2025). These results validate the effectiveness of both the retrieval strategy and the
+synthesized training data.
+2 DIVER Model
+This section details the DIVER framework, which comprises document processing, a first-stage query
+expansion and retrieval module, and a second-stage reranking model. An overview of the pipeline is
+illustrated in Figure 2.
+1https://seed1-5-embedding.github.io/
+2
+
+
+--- PAGE 3 ---
+...
+BM25 Retriever
+Retrieval
+Scores 
+  TOP-100 DOCs
+RankDOCs
+...
+...
+>_a 1
+>_b 2
+>_c 3
+>_n 100
+TOP-10 DOCs
+RankDOCs
+...
+...
+>_f 1
+>_d 2
+>_c 3
+>_h 10
+Merge
+Doc4
+Doc1
+Doc53
++
+Doc1
+Doc2
+Doc100
+Query
+...
+...
+Query Q1 final QQ2 Q3 ...
+provided 
+documents
+DIVER-DChunk
+clean
+rechunk
+DOC
+DOC
+DOC
+DOC
+new 
+documents
+...
+...
+...
++ Doc1 score1Query
++ Doc2 score2Query
++ Doc100 score100Query
+DIVER-QExpand
+DIVER-Retriver
+DIVER-Rerank
+DIVER-Rerank-Pointwise DIVER-Rerank-Listwise
+Figure 2: Overview of DIVER pipeline. The DIVER pipeline begins with document cleaning and semantic-
+based rechunking to improve textual coherence. User queries are then iteratively expanded using the
+DIVER-QExpand module to enhance their expressiveness. Document relevance is scored by both the
+DIVER Retriever and BM25 Retriever. The top-100 candidates are reranked using DIVER-Rerank, which
+assigns LLM-based helpfulness scores. Final rankings are obtained by interpolating pointwise and
+listwise reranking scores to improve overall precision. To ensure fair comparison with other baselines,
+DIVER-DChunk is excluded from the main experiments and only evaluated separately in section 3.2.3.
+2.1 Document Processing
+The BRIGHT benchmark covers three high-level domains with StackExchange, Coding, and Theorem-
+based content. We observe that significant data quality issues are concentrated in seven StackExchange-
+derived subdomains. These issues, characteristic of web-scraped content, include truncated sentences,
+excessive blank lines, and other structural inconsistencies that hinder semantic coherence. For retrievers,
+this is akin to reading a disordered book cluttered with boilerplate, disrupting narrative flow and making
+reasoning more difficult.
+To address these issues and enhance document readability, we implemented a rule-based cleaning process.
+This process involved removing unnecessary blank lines, merging incomplete sentences, and eliminating
+redundant spaces, followed by reassembling paragraphs to restore logical flow and structural coherence.
+Additionally, some documents exceeded the 16k token limit of certain encoders, and long text chunks
+often included semantically irrelevant information, further impairing retrieval accuracy and downstream
+reasoning. To handle lengthy documents, we employed the Chonkie2 library to perform semantic-aware
+chunking. Using the Qwen3-Embedding-0.6B (Zhang et al., 2025b) model with a similarity threshold of
+0.5, the text was divided into smaller chunks of up to 4096 tokens, with a minimum size of one sentence
+per chunk. To ensure semantic continuity across chunks, we applied an overlap refinement strategy
+that retained 20% overlapping content using a character-based suffix method. This approach achieves a
+balance between maintaining semantic integrity and capturing sufficient context for downstream tasks.
+To ensure consistency with the BRIGHT benchmark ground truth, we retained the original document
+IDs for each chunk instead of reassigning new IDs. As a result, some document IDs may correspond
+to multiple chunks. In subsequent computations of similarity between queries and documents, the
+relevance score is assigned by taking the maximum similarity among all chunks that share the same ID.
+This ensures alignment with the benchmark while enabling fine-grained document processing.
+2.2 Query Expansion
+Query expansion (Wang et al., 2024) is a widely used technique in information retrieval, aiming to improve
+performance by enriching initial queries with contextually relevant terms. ThinkQE (Lei et al., 2025) is a
+query expansion framework that integrates LLM-based reasoning with iterative corpus interaction. The
+2https://github.com/chonkie-inc/chonkie
+3
+
+
+--- PAGE 4 ---
+Table 1: Prompts used in DIVER-QExpand for query expansion. Braces{}denote placeholders.
+Prompt Stage LLM Instruction
+First Round Given a query and the provided passages (most of which may be incorrect or irrel-
+evant), identify helpful information from the passages and use it to write a correct
+answering passage. Use your own knowledge, not just the example passages!
+Query:{query}
+Possible helpful passages:{top-k retrieved documents}
+Subsequent Rounds Given a query, the provided passages (most of which may be incorrect or irrelevant),
+and the previous round’s answer, identify helpful information from the passages and
+refine the prior answer. Ensure the output directly addresses the original query. Use
+your own knowledge, not just the example passages!
+Query:{query}
+Possible helpful passages:{top-k retrieved documents}
+Prior generated answer:{last-round expansion}
+Figure 3: The training process of DIVER-Retriever.
+process consists of multiple rounds of query expansion and document retrieval. In each round, the LLM
+generates an expanded query based on the newly retrieved documents, which then guides the retrieval
+of more relevant documents in the next round, forming a feedback loop for progressive refinement.
+Based on ThinkQE (Lei et al., 2025), we retain its iterative design in DIVER-QExpand but make two
+practical modifications. First, we replace the BM25 retriever with a dense retriever trained for reasoning-
+intensive task (see Section 2.3). Its semantic similarity scores yield passages that are more relevant to
+the query’s intent. Second, instead of concatenating all intermediate query expansions, which can often
+exceed 2000 tokens, we simplify the process by retaining only the original query and the final-round
+expansion. This approach reduces length of expanded query while maintaining critical information for
+effective retrieval.
+We use the QWEN-R1-Distill-14B model (DeepSeek-AI et al., 2025) with a temperature of 0.7 to generate
+expansions with controlled variability. The prompt instructions vary depending on whether it is the first
+or a subsequent round, as shown in Table 1. DIVER-QExpand performs two rounds of retrieval and
+expansion, selecting the top-5 documents in each. To ensure diversity, previously retrieved documents
+are excluded in later rounds. Each document is truncated to 512 tokens before being fed into the LLM.
+These adjustments balance computational efficiency with retrieval performance.
+2.3 Reasoning-intensive Retriever
+Most existing retrievers are trained on datasets consisting of short factual queries, where the relationship
+between queries and relevant documents is straightforward. This reliance on such datasets limits their
+performance on reasoning-intensive retrieval tasks, which require deeper understanding and more
+complex reasoning. For instance, the leading SFR-EmbeddingMistral (Meng et al., 2024) achieves a score
+of 59.0 on the MTEB (Muennighoff et al., 2023) retrieval subset (BEIR (Thakur et al., 2021)) but performs
+significantly worse on reasoning-intensive benchmarks such as BRIGHT, where the nDCG@10 score
+drops to 18.3.
+To address these performance gaps, ReasonIR-8B (Shao et al., 2025) was introduced as the first bi-
+encoder retriever tailored for reasoning-intensive tasks. This model employs a synthetic data generation
+pipeline that produces queries of varying lengths and reasoning complexity for each document while
+also generating challenging hard negatives—documents that appear superficially relevant but lack actual
+relevance. Another approach, RaDeR (Das et al., 2025), proposes a family of dense retrievers trained
+using data derived from mathematical problem-solving processes generated by LLM. RaDeR enhances
+4
+
+
+--- PAGE 5 ---
+training through retrieval-augmented reasoning trajectories and self-reflective relevance evaluations,
+which help generate diverse and hard negative examples. Although primarily trained on mathematical
+reasoning data, RaDeR models generalize well to other reasoning tasks in the BRIGHT benchmark,
+showing particularly strong performance on the Math and Coding subsets.
+Both REASONIR-8B and RaDeR highlight a critical challenge in developing reasoning-based retrievers:
+creating high-quality datasets that encompass diverse query formats, lengths, and reasoning complexities.
+Therefore, we generate training data that incorporates synthetic hard negatives from the medical, general
+and mathematical domains, thereby increasing both diversity and difficulty. Specifically, 60,000 medical
+examples and 20,000 general examples are collected from real-world cases, with an additional 20,000
+hard negatives generated using the strategy described in section A. For the mathematical domain, we
+include problem-solving trajectories3, comprising about 120,000 examples with hard negatives, to enhance
+performance on math-related reasoning tasks. The training process of DIVER-Retriever is illustrated
+in Figure 3, and further details on the construction of positive and negative samples are presented in
+section A.
+Our dense retriever adopts Qwen3-Embedding-4B (Zhang et al., 2025b) as its backbone, a powerful
+pretrained language model that excels in various language tasks. To obtain a vector representation for a
+given text, we feed the full input sequence into Qwen3-Embedding-4B and extract the hidden state of the
+end-of-sequence (EOS) token from the model’s last layer. The hidden state of [EOS] token is theoretically
+expected to capture the complete contextual and semantic information of the sequence, as it reflects the
+model’s final internal state after processing all input tokens. This approach is both common and effective
+in contrastive-learning frameworks as well as other text-embedding tasks.
+The retriever is fine-tuned using the InfoNCE loss (Rusak et al., 2024), commonly used in contrastive
+learning. It minimizes the distance between semantically similar pairs while maximizing the distance
+from dissimilar pairs. Given an input sequence of tokens t=t 1,t 2, . . . ,tk with an appended EOS token,
+the decoder-only language model encodes it into an embedding Et using the hidden state of the EOS
+token, for either a queryqor a documentd:
+Et =Decoder(t 1t2 · · ·t k⟨eos⟩)[−1], (1)
+where Decoder(·) denotes the backbone model. Query and document embeddings are compared via
+cosine similarity:s(q,d) =cos(E q,E d). The InfoNCE loss is computed as:
+L(q,d +,D −) =−log exp(s(q,d +))
+exp(s(q,d +)) + ∑d−∈D− exp(s(q,d −)) , (2)
+where d+ is a positive document and D− is a curated set of hard negatives. Using curated hard negatives
+rather than all irrelevant documents improves training efficiency without sacrificing retrieval quality.
+The final relevance score between a query and a document, Sretriever , is calculated as a weighted sum:
+Sretriever = 0.5 ·S DIVER−Retriever + 0.5 ·S BM25. To ensure consistent scaling, both SDIVER−Retriever and
+SBM25 are normalized to the range of 0 to 1. This approach effectively combines the semantic strengths of
+dense and sparse retrievers, improving retrieval performance as shown in section 3.2.1.
+2.4 Reranking
+The retrieve-then-rerank paradigm is widely used to enhance retrieval performance, especially in
+reasoning-intensive tasks where LLM rerankers have demonstrated significant effectiveness (Su et al.,
+2025). Reranking approaches typically fall into four categories: pointwise (Zhuang et al., 2024), pair-
+wise (Qin et al., 2024; Chen et al., 2025c), setwise (Zhuang et al., 2025), and listwise methods (Reddy et al.,
+2024; Yang et al., 2025; Zhang et al., 2025a). For a more comprehensive discussion, we refer readers to (Li
+et al., 2025).
+Our DIVER-Rerank integrates pointwise and listwise paradigms to capture both local and global per-
+spectives. The pointwise module (DIVER-Rerank-Pointwise) follows the idea of ReasonIR (Shao et al.,
+2025), which uses an LLM (i.e., Qwen-2.5-32B-Instruct (Team, 2024)) to assign helpfulness scores to
+individual documents. Instead of the 0–5 scale in ReasonIR, we adopt a finer 0–10 scale to evaluate
+query–document relevance, normalize the scores to [0, 1], and compute the final pointwise score as
+0.6·S reranker +0.4·S retriever to balance retriever and reranker contributions.
+To complement this local evaluation, the listwise module (DIVER-Rerank-Listwise) employs an LLM (e.g.
+Deepseek-R1-0528) to directly rank the top-100 candidate documents of the query, offering a global view
+of document relevance. The final reranking result integrates both modules, leveraging the fine-grained
+local scoring of pointwise rerankers and the holistic ranking ability of listwise rerankers.
+3https://huggingface.co/datasets/Raderspace/MATH NuminaMath allquerytypes
+5
+
+
+--- PAGE 6 ---
+3 Experiments
+The DIVER approach is evaluated on the BRIGHT benchmark against competitive baselines. Following
+prior work (Su et al., 2025), the normalized Discounted Cumulative Gain at top-10 (nDCG@10) is used as
+the evaluation metric. Results are reported for all BRIGHT datasets: Biology (Bio.), Earth Science (Earth.),
+Economics (Econ.), Psychology (Psy.), Robotics (Rob.), Stack Overflow (Stack.), Sustainable Living (Sus.),
+LeetCode (Leet.), Pony, AoPS, and TheoremQA with question retrieval (TheoQ.) and theorem retrieval
+(TheoT.). Avg. denotes the average score across the 12 datasets. Baseline results are taken from their
+original papers or reproduced using our own implementations.
+3.1 Overall Performance
+We compare our model with competitive approaches listed on the BRIGHT leaderboard 4, where the
+top-8 methods all adopt reranking strategies to achieve superior performance. Following the standard
+setup in (Su et al., 2025; Shao et al., 2025), reranking is applied to the top-100 documents retrieved in
+the first stage. This section compares DIVER with 7 baselines: (1)Rank-R1-14B(Zhuang et al., 2025), a
+LLM-based setwise reranker designed for reasoning-intensive ranking tasks, applied to BM25 results on
+original queries. (2)Qwen1.5-7B with InteRank-3B(Samarinas & Zamani, 2025) uses small-size models
+for reasoning-based document reranking. (3)GPT4 with Rank1-32B(Weller et al., 2025), which combines
+GPT-4 Reason-query with a reasoning reranker that “think” before making relevance judgments. (4)
+ReasonIR with QwenRerank(Shao et al., 2025), the baseline introduced in the ReasonIR paper, which
+scores documents from 0 to 5. (5)ReasonIR with Rank-R1-32B 5, ranked 5th, replaces the original
+pointwise reranker with with a listwise one. (6)RaDeR with QwenRerank 6, ranked 4th, adopts the same
+reranker as ReasonIR. (7)XRR2 7, currently ranked 3rd, uses prompt-based query expansion and performs
+multiple reranking rounds by LLM. (8)ReasonRank(Liu et al., 2025), currently ranked 2nd, proposes a
+RL–based listwise reranker applied to the retrieval results of RaDeR. (9)BGE-Reasoner 8currently ranked
+1st, generates multiple rewritten queries for retrieval and ensembles reranking results from different
+model sizes to produce the final ranking.
+Table 2 demonstrates that DIVER(v1) achieves an nDCG@10 of41.6on Aug 12, 2025, surpassing XRR2
+by+1.3 pointsand setting a new SOTA on the BRIGHT leaderboard at that time. XRR2 relies on
+GPT-4o for query expansion and gemini-2.5-flash-preview-04-17 for reranking, performing multiple
+reranking passes with score averaging. In contrast, DIVER achieves higher performance with significantly
+lower computational cost. DIVER also outperforms ReasonIR and RaDeR by a substantial margin,
+demonstrating the effectiveness of its query expansion and retrieval pipeline. Subsequently, on Aug 26,
+2025, DIVER(v2) reaches an nDCG@10 of45.8, surpassing BGE-Reasoner by+0.8 pointsand establishing
+a new SOTA. Our improvements attribute to enhanced query expansion and the combined pointwise
+and listwise reranker.
+3.2 Ablation Studies
+This section investigates the contributions of three key components in our framework: the DIVER-
+Retriever for retrieval, DIVER-QExpand for query expansion, and DIVER-DChunk for document cleaning
+and chunking.
+3.2.1 Comparison with Different Retrievers
+We compare our DIVER-Retriever with a range of retrieval baselines: (1) the sparse retrieverBM25(Robert-
+son & Zaragoza, 2009); (2) open-source dense retrievers includingSBERT(all-mpnet-base-v2, Reimers &
+Gurevych (2019)),gte-Qwen1.5-7B(Li et al., 2023), andQwen3-4B(Qwen3-Embedding-4B, Zhang et al.
+(2025b)); (3) proprietary models fromOpenAI 9 (text-embedding-3-large) andGoogle(text-embedding-
+preview0409, Lee et al. (2024)); and (4) reasoning-aware retrievers includingReasonIR-8B(Shao et al.,
+2025),RaDeR-7B(Das et al., 2025), andSeed1.5-Embedding 10.
+As shown in Table 3, DIVER-Retriever achieves SOTA performance on the BRIGHT benchmark. It
+consistently outperforms other retrievers across original and expanded queries, with nDCG@10 scores of
+4https://brightbenchmark.github.io/
+5https://huggingface.co/ielabgroup/Rank-R1-32B-v0.2
+6https://github.com/Debrup-61/RaDeR
+7https://github.com/jataware/XRR2
+8https://github.com/FlagOpen/FlagEmbedding/tree/master/research/BGE Reasoner
+9https://openai.com/index/new-embedding-models-and-api-updates/.
+10https://seed1-5-embedding.github.io/
+6
+
+
+--- PAGE 7 ---
+Table 2: Performance comparisons with competitive baselines on the BRIGHT leaderboard. The best result
+for each dataset is highlighted inbold. DIVER(v1) denotes the initial version with DIVER-QExpand,
+DIVER-Retriever, and DIVER-Rerank-Pointwise. DIVER(v2) includes advanced query expansion and
+combined pointwise and listwise DIVER-Rerank. DIVER(v3) uses BGE-Reasoner-Embed-0928 (Chen
+et al., 2025a) for retrieval and our proposed groupwise reranking (Sun et al., 2025), achieving the latest
+state-of-the-art performance.
+StackExchange Coding Theorem-based
+Method Avg. Bio. Earth. Econ. Psy. Rob. Stack. Sus. Leet. Pony AoPS TheoQ. TheoT.
+Rank-R1-14B 20.5 31.2 38.5 21.2 26.4 22.6 18.9 27.5 9.2 20.2 9.7 11.9 9.2
+Qwen1.5-7B with InteRank-3B27.4 51.2 51.4 22.4 31.9 17.3 26.6 22.4 24.5 23.1 13.5 19.3 25.5
+GPT4 with Rank1-32B 29.4 49.7 35.8 22.0 37.5 22.5 21.7 35.0 18.8 32.5 10.8 22.9 43.7
+ReasonIR with QwenRerank36.9 58.2 53.2 32.0 43.6 28.8 37.6 36.0 33.2 34.8 7.9 32.6 45.0
+ReasonIR with Rank-R1-32B38.8 59.5 55.1 37.9 52.7 30.0 39.3 45.1 32.1 17.1 10.7 40.4 45.6
+RaDeR with QwenRerank39.2 58.0 59.2 33.0 49.4 31.8 39.0 36.4 33.5 33.3 10.8 34.2 51.6
+XRR2 40.3 63.1 55.4 38.5 52.9 37.1 38.2 44.6 21.9 35.0 15.7 34.4 46.2
+ReasonRank 40.8 62.7 55.5 36.7 54.6 35.7 38.0 44.8 29.5 25.6 14.4 42.0 50.1
+DIVER(v1) 41.6 62.2 58.7 34.4 52.9 35.6 36.5 42.9 38.925.4 18.3 40.0 53.1
+BGE-Reasoner 45.2 66.563.739.4 50.3 37.0 42.9 43.7 35.1 44.3 17.2 44.258.5
+DIVER(v2) 45.8 68.062.5 42.058.2 41.544.3 49.2 34.8 32.9 19.144.3 52.6
+DIVER(v3) 46.8 66.063.7 42.455.0 40.644.7 50.4 32.547.3 17.246.455.6
+Table 3: nDCG@10 performance of various retrievers on the BRIGHT benchmark, evaluated using original
+queries, GPT-4 CoT reasoning or DIVER-QExpand queries. “+BM25 (Hybrid)” denotes a variant that
+interpolates the similarity scores of the retriever and BM25 with an equal weight of 0.5.
+StackExchange Coding Theorem-based
+Method Avg. Bio. Earth. Econ. Psy. Rob. Stack. Sus. Leet. Pony AoPS TheoQ. TheoT.
+Evaluate Retriever with Original Query
+BM25 14.5 18.9 27.2 14.9 12.5 13.6 18.4 15.0 24.4 7.9 6.2 10.4 4.9
+SBERT 14.9 15.1 20.4 16.6 22.7 8.2 11.0 15.3 26.4 7.0 5.3 20.0 10.8
+gte-Qwen1.5-7B 22.5 30.6 36.4 17.8 24.6 13.2 22.2 14.8 25.5 9.9 14.4 27.8 32.9
+Qwen3-4B 5.6 3.5 8.0 2.3 2.0 1.6 1.0 4.4 2.1 0.1 4.9 18.0 19.2
+OpenAI 17.9 23.3 26.7 19.5 27.6 12.8 14.3 20.5 23.6 2.4 8.5 23.5 11.7
+Google 20.0 22.7 34.8 19.6 27.8 15.7 20.1 17.1 29.6 3.6 9.3 23.8 15.9
+ReasonIR-8B 24.4 26.2 31.4 23.3 30.0 18.0 23.9 20.5 35.0 10.5 14.731.9 27.2
+RaDeR-7B 25.5 34.6 38.9 22.1 33.0 14.8 22.5 23.7 37.3 5.0 10.2 28.4 35.1
+Seed1.5-Embedding27.2 34.8 46.9 23.4 31.6 19.1 25.4 21.0 43.24.9 12.2 33.3 30.5
+DIVER-Retriever(v1)28.9 41.8 43.7 21.7 35.3 21.0 21.2 25.1 37.6 13.2 10.738.437.3
+DIVER-Retriever(v2)31.9 49.0 49.7 32.0 41.9 30.2 28.4 33.7 13.316.2 8.6 37.542.3
+Evaluate Retriever with GPT-4 REASON-query
+BM25 27.0 53.6 54.124.3 38.7 18.9 27.7 26.3 19.3 17.6 3.9 19.2 20.8
+SBERT 17.8 18.5 26.3 17.5 27.2 8.8 11.8 17.5 24.3 10.3 5.0 22.3 23.5
+gte-Qwen1.5-7B 24.8 35.5 43.1 24.3 34.3 15.4 22.9 23.9 25.4 5.2 4.6 28.7 34.6
+Qwen3-4B 5.5 1.3 17.3 2.5 6.2 1.0 4.8 4.5 3.0 5.9 0.0 7.2 12.5
+OpenAI 23.3 35.2 40.1 25.1 38.0 13.6 18.2 24.2 24.5 6.5 7.7 22.9 23.8
+Google 26.2 36.4 45.6 25.6 38.2 18.729.517.9 31.1 3.7 10.0 27.8 30.4
+ReasonIR-8B 29.9 43.6 42.932.738.8 20.9 25.827.5 31.519.6 7.4 33.1 35.7
+RaDeR-7B 29.2 36.1 42.9 25.2 37.9 16.6 27.4 25.0 34.811.9 12.037.743.4
+DIVER-Retriever(v1)32.1 51.9 53.5 29.541.2 21.427.5 26.1 33.5 11.7 9.539.339.7
+Evaluate retriever with DIVER-QExpand query
+ReasonIR-8B 32.6 49.4 44.7 32.4 44.0 26.6 31.8 29.0 32.3 12.8 9.140.738.4
++BM25 (Hybrid) 35.7 56.8 53.533.0 48.5 29.4 34.2 32.0 35.216.8 12.9 39.3 36.8
+DIVER-Retriever(v1)33.9 54.5 52.7 28.8 44.9 25.1 27.4 29.5 34.5 10.0 14.540.744.7
++BM25 (Hybrid) 37.2 60.0 55.931.8 47.9 27.1 33.9 31.9 35.123.1 16.836.946.6
+28.9, 32.1, and 33.9, respectively. Notably, our 4B model significantly surpasses reasoning-aware retrievers
+such as ReasonIR-8B and RaDeR-7B, and even exceeds the commercial model SeedEmbedding-1.5 by
+1.7 nDCG@10 on original queries. These results highlight DIVER-Retriever’s effectiveness in handling
+reasoning-intensive tasks. Furthermore, the performance of DIVER-Retriever can be further enhanced
+by integrating it with a sparse retrieval method. By interpolating its relevance scores with those from
+BM25 at a ratio of 0.5, the nDCG@10 score improves substantially to37.2. This hybrid scoring strategy
+highlights the complementary strengths of dense and sparse retrieval methods, offering a robust solution
+for capturing both deep reasoning and surface-level relevance in real-world retrieval scenarios.
+3.2.2 Comparison with Different Expanded Queries
+This section compares DIVER-QExpand with several representative zero-shot query expansion methods:
+(1)GPT-4 Reason-query(Su et al., 2025), which uses chain-of-thought reasoning steps from GPT-4 as
+7
+
+
+--- PAGE 8 ---
+Table 4: nDCG@10 performance of various query expansion methods on the BRIGHT benchmark,
+evaluated using BM25 and ReasonIR retrievers.
+StackExchange Coding Theorem-based
+Method Avg. Bio. Earth. Econ. Psy. Rob. Stack. Sus. Leet. Pony AoPS TheoQ. TheoT.
+Using BM25 retriever
+GPT-4 Reason-query26.5 53.6 53.6 24.3 38.6 18.8 22.7 25.9 19.3 17.7 3.9 18.9 20.2
+XRR2 24.5 57.7 52.5 22.1 36.0 17.0 23.9 25.3 16.3 11.5 2.4 15.8 14.2
+TongSearch-QR-7B27.9 57.950.9 21.9 37.0 21.3 27.0 25.6 23.6 14.4 7.0 26.122.0
+ThinkQE 30.0 55.9 52.326.539.0 22.927.9 30.9 25.220.9 10.3 27.021.4
+DIVER-QExpand 29.5 56.754.525.943.9 23.227.0 28.8 25.616.6 8.7 23.4 20.4
+Using ReasonIR retriever
+GPT-4 Reason-query29.9 43.6 42.932.738.8 20.9 25.8 27.5 31.5 19.6 7.4 33.1 35.7
+XRR2 30.8 47.146.229.6 39.9 22.3 32.8 24.6 24.727.7 7.0 33.6 33.8
+TongSearch-QR-7B31.8 46.2 45.1 31.2 39.6 25.3 28.7 28.4 31.2 16.3 10.840.039.3
+ThinkQE 30.8 44.9 45.2 31.9 40.9 24.633.528.9 23.5 9.3 8.541.137.4
+DIVER-QExpand 32.6 49.444.7 32.444.0 26.631.829.0 32.312.8 9.1 40.7 38.4
+Table 5: Effect of DIVER-DChunk on retrieval performance across StackExchange domains.
+StackExchange
+Method Avg. Bio. Earth. Econ. Psy. Rob. Stack. Sus.
+bm25 37.1 56.7 54.5 25.9 43.9 23.2 27.0 28.8
+w/ DIVER-DChunk 37.0 56.2 55.2 25.7 44.7 23.1 25.8 28.2
+DIVER-Retriever 37.5 54.5 52.7 28.8 44.9 25.1 27.4 29.5
+w/ DIVER-DChunk 38.0 54.6 53.3 29.2 47.2 24.7 28.6 28.5
+queries, provided in BRIGHT; (2)XRR2 11, which applies carefully crafted prompts with GPT-4o for
+query expansion; (3)T ongSearch-QR-7B(Qin et al., 2025), a small-size language model trained by
+reinforcement learning (RL) for reasoning-based query rewriting; and (4)ThinkQE-14B(Lei et al., 2025),
+a thinking-based query expansion method that iteratively refines queries using feedback from retrieved
+documents.
+Table 4 shows that DIVER-QExpand achieves the highest overall performance on the BRIGHT benchmark,
+reaching an average nDCG@10 of32.6with the ReasonIR retriever,1.8points higher than the best baseline,
+ThinkQE. The gain comes from its feedback-based expansion strategy, where a stronger retriever provides
+more relevant context, enabling more effective query reformulation. This advantage is most evident
+with reasoning-aware retrievers, as DIVER-QExpand consistently outperforms competitive methods
+across most datasets when paired with ReasonIR. With BM25, it scores 29.5, slightly below ThinkQE,
+likely because ThinkQE’s longer expansions yield more keyword overlaps for lexical retrieval. Overall,
+DIVER-QExpand proves particularly effective in reasoning-intensive retrieval, where feedback during
+expansion offers clear advantage over other methods.
+3.2.3 Effect of DIVER-DChunk
+We investigate the impact of DIVER-DChunk, the document cleaning and chunking strategy in our
+pipeline. In the main comparisons above, this component was not used to ensure fairness, as other
+baselines relied on the original BRIGHT document chunks without modification. However, the original
+corpus contains notable segmentation issues, particularly in seven StackExchange-derived subdomains,
+where structural artifacts from web scraping lead to inconsistent formatting, fragmented sentences We
+applied DIVER-DChunk to these subdomains, using DIVER-QExpand queries.
+As shown in Table 5, the improvement for DIVER-Retriever is consistent across most domains, with
+larger gains in Psychology (+2.3) and Stack Overflow (+1.2). This suggests that cleaner and semantically
+aligned chunks provide richer context for dense retrieval models. The impact on BM25 is minimal, which
+is expected since it is less sensitive to chunk coherence. Our observation aligns with recent work (Chen
+et al., 2025b) that also highlights the limitations of BRIGHT’s original chunking and proposes BRIGHT+,
+a multi-agent LLM-based cleaning and rechunking pipeline to build a higher-quality corpus.
+11https://github.com/jataware/XRR2/tree/main
+8
+
+
+--- PAGE 9 ---
+4 Conclusion
+We present DIVER, a retrieval pipeline designed for reasoning-intensive tasks where query–document
+relevance hinges on implicit and abstract relationships. On the BRIGHT benchmark, DIVER achieves
+an nDCG@10 of 45.8, surpassing the previous best score of 45.2 from BGE-Reasoner, and consistently
+outperforms strong baselines such as ReasonIR and RaDeR with both original and rewritten queries.
+These improvements largely stem from iterative query refinement and reasoning-oriented retrieval
+trained on high-quality hard contrastive document pairs. Future work will focus on developing an
+end-to-end framework that integrates query expansion, retrieval, and reranking into a unified model,
+reducing system latency and computational overhead while maintaining high retrieval performance.
+9
+
+
+--- PAGE 10 ---
+A Appendix
+This section details our strategy for constructing positive and negative samples when training embedding
+models. This method aims to enhance the model’s discriminative power and generalization performance
+by leveraging the robust capabilities of large language models (LLMs) to generate high-quality positive
+samples and challenging hard negative samples.
+A.1 General sample construction
+To construct high-quality positive and negative samples for embedding model training, we first collect
+query–document pairs from a large-scale web search engine. Each query is paired with its retrieved
+document (denoted as Doc) to form an initial candidate set.
+We then use GPT-4 to provide fine-grained relevance annotations for each query–document pair on a
+0–10 scale, where higher scores indicate stronger semantic and contextual relevance. Specifically, pairs
+with annotation scores greater than 6 are selected as positive samples, reflecting high semantic alignment,
+while pairs with scores below 4 are selected as negative samples, indicating low or no semantic relevance.
+Samples with scores between 4 and 6 (inclusive) are excluded to ensure a clear distinction between the
+positive and negative classes, thereby improving the robustness of downstream contrastive learning.
+This annotation process enables the embedding model to learn from both high-quality positive examples
+and challenging negative examples, facilitating better generalization and retrieval performance in real-
+world scenarios. The instruction given to the LLM is as follows:
+Prompt 1: Prompt for General Sample Construction
+Your task is to judge how useful a piece of Doc is as a reference for answering a Query. The Query
+is the user’s question; the Doc includes the web page’s title and some retrieved snippets from the
+page.
+Please follow the rules below strictly:
+1. Pay attention to whether the time, place, subject, and object in the Query match those in the
+Doc; if they do not match, you must deduct points.
+2. Pay special attention to whether proper nouns in the Query match those in the Doc;
+3. Regarding the Doc:
+3.1 Identify the main meaning of the Doc. If only a small part of the Doc is relevant while the
+majority discusses other topics, you must deduct points;
+3.2 Assess the applicability of the Doc; if it is overly one-sided, you must deduct points.
+4. If the Query is vague and its specific meaning cannot be determined, you should deduct points
+appropriately.
+5. Your output must be in JSON format and contain 2 keys: one is score, and the other is reason.
+The score represents the number, and reason explains your scoring rationale. Do not output any
+other unrelated Doc.
+I will now give you a Query and Doc. Please follow the rules above strictly and output the score
+and reason in JSON format. Do not output anything else.
+Query: XXX
+Doc: XXX
+Response:
+A.2 Hard sample generation
+A.2.1 Positive Sample Generation
+Our approach to constructing positive samples focuses on capturing deep semantic relevance between
+queries and documents. We configure a pre-trained LLM, specifically Deepseek-R1, to simulate the role
+of a search engine. Given a specific query, the LLM is instructed to ”generate” several highly relevant
+documents that a search engine would ideally retrieve for that query.
+Positive Sample Relevance Criteria.When generating documents, the LLM’s primary objective is to
+ensure that the output is semantically strongly related to the query, mimicking the behavior of a real
+search engine returning the most pertinent results. These documents may contain keywords directly
+associated with the query, but more crucially, they exhibit a high degree of conceptual or thematic
+consistency. The following box presents the instruction for generating positive samples.
+10
+
+
+--- PAGE 11 ---
+Prompt 2: Prompt for Positive Sample Generation
+You are a simulated Google search engine. Your task is to return webpages that can answer the
+given Query. Please follow these guidelines:
+1. Mimic the style of a typical webpage: each result must include both a title and content.
+2. For multi-hop questions, you only need to generate the document for the final hop.
+Example: If the Query describes symptoms and asks for treatment, first infer the disease yourself,
+then produce a webpage that discusses treatment for that disease only—do not describe the
+symptoms again.
+3. If the user’s intent is narrow and could reasonably be satisfied by a single webpage, generate
+just one document. If the Query contains multiple sub-questions that would normally require
+separate sources, provide multiple documents, ensuring each covers a distinct, non-overlapping
+topic.
+4. Output format:
+Document 1:{”title”:”xxx”,”content”:”xxx”}
+. . .
+Document n:{”title”:”xxx”,”content”:”xxx”}
+5. Generate no more than three documents in total. The content of each document must be 400–800
+words, self-contained, and coherent.
+6. Remember, you are simulating real Google search results. Your webpages should not analyze or
+directly answer the Query; instead, they should present relevant information in a conversational,
+everyday style, similar to popular health sites like Dingxiangyuan—but without describing
+specific patient cases.
+Now I will give you a Query; please generate webpage content in the required format.
+Query: XXX
+Response:
+Each document generated by the LLM is treated as a positive sample for its corresponding query. This
+method ensures that positive samples not only share lexical overlap with the query but also provide rich
+contextual and relevant information at a semantic level.
+A.2.2 Hard-Negative Sample Generation
+Constructing hard negatives is essential for training embedding models, especially when we want them to
+discern subtle semantic differences. We therefore impose strict constraints on the LLM when it produces
+such samples.
+1. LLM-generated hard negatives For each query, the LLM is instructed to create negative samples. Unlike
+positive samples, these must adhere to explicit non-relevance criteria.
+2. Core constraint The generated negatives may share only superficial lexical overlap with the query;
+they must exhibit no deep semantic relevance.
+3. Detailed requirements a) Shallow lexical overlap: A hard negative may reuse a handful of keywords or
+short phrases from the query. This surface-level similarity mimics “deceptive” real-world documents that
+look relevant but are not. b) No deep semantic relation: Despite the overlapping words, the LLM must
+ensure the overall meaning, topic, or context is entirely unrelated to the query. Example: If the query is
+“How to grow roses,” an acceptable hard negative might mention “rose,” yet discuss “the popularity of
+rose-colored lipstick” or “the history of the Wars of the Roses,” rather than gardening.
+This strategy compels the embedding model to distinguish between lexical resemblance and true semantic
+relevance. By exposing the model to these “seemingly related but actually irrelevant” samples, it learns to
+capture the genuine intent behind a query and relies less on simple keyword matching, thereby boosting
+retrieval accuracy in complex scenarios. The following box presents the instruction for generating negtive
+samples.
+11
+
+
+--- PAGE 12 ---
+Prompt 3: Prompt for Hard-Negative Sample Generation
+You have been assigned a paragraph-generation task:
+You will receive incomplete data containing the following information:
+• “input”: a string consisting of a random prompt specified by the task.
+• “positive document”: a string that, according to the task, is relevant to the “input.”
+Your job is to produce a JSON-formatted “hard negative document”:
+• The “hard negative document” is a difficult negative sample. While it shares some lexical
+overlap with the input, it does not help solve the input’s problem and is less relevant to the input
+than the “positive document.”
+Please observe these guidelines:
+1. The value of “hard negative document” must be written in Chinese.
+2. The “hard negative document” should be a long passage (at least 300 Chinese characters) and
+should avoid excessive lexical overlap; otherwise, the task will be too simple.
+3. The “input,” “positive document,” and “hard negative document” must remain independent of
+one another.
+Your output must always be a single JSON object—provide no explanations or additional text. Be
+creative!
+Now, apply the instructions to the following data:
+’input’: XXX
+’positive document’: XXX
+Your response:
+12
+
+
+--- PAGE 13 ---
+References
+Jianlyu Chen, Junwei Lan, Chaofan Li, Defu Lian, and Zheng Liu. Reasonembed: Enhanced text
+embeddings for reasoning-intensive document retrieval.CoRR, abs/2510.08252, 2025a. URL https:
+//arxiv.org/abs/2510.08252.
+Liyang Chen, Yujun Cai, Jieqiong Dong, and Yiwei Wang. BRIGHT+: upgrading the BRIGHT benchmark
+with marcus, a multi-agent RAG clean-up suite.CoRR, abs/2506.07116, 2025b. URL https://doi.or
+g/10.48550/arXiv.2506.07116.
+Yiqun Chen, Qi Liu, Yi Zhang, Weiwei Sun, Xinyu Ma, Wei Yang, Daiting Shi, Jiaxin Mao, and Dawei Yin.
+Tourrank: Utilizing large language models for documents ranking with a tournament-inspired strategy.
+InWWW, pp. 1638–1652, 2025c.
+Debrup Das, Se ´an ´O Nuall ´ain, and Razieh Rahimi. RaDeR: reasoning-aware dense retrieval models.
+CoRR, abs/2505.18405, 2025. URLhttps://doi.org/10.48550/arXiv.2505.18405.
+DeepSeek-AI, Daya Guo, Dejian Yang, Haowei Zhang, Junxiao Song, Ruoyu Zhang, Runxin Xu, Qihao
+Zhu, Shirong Ma, Peiyi Wang, Xiao Bi, Xiaokang Zhang, Xingkai Yu, Yu Wu, Z. F. Wu, Zhibin Gou,
+Zhihong Shao, Zhuoshu Li, Ziyi Gao, Aixin Liu, Bing Xue, Bingxuan Wang, Bochao Wu, Bei Feng,
+Chengda Lu, Chenggang Zhao, Chengqi Deng, Chenyu Zhang, Chong Ruan, Damai Dai, Deli Chen,
+Dongjie Ji, Erhang Li, Fangyun Lin, Fucong Dai, Fuli Luo, Guangbo Hao, Guanting Chen, Guowei Li,
+H. Zhang, Han Bao, Hanwei Xu, Haocheng Wang, Honghui Ding, Huajian Xin, Huazuo Gao, Hui Qu,
+Hui Li, Jianzhong Guo, Jiashi Li, Jiawei Wang, Jingchang Chen, Jingyang Yuan, Junjie Qiu, Junlong Li,
+J. L. Cai, Jiaqi Ni, Jian Liang, Jin Chen, Kai Dong, Kai Hu, Kaige Gao, Kang Guan, Kexin Huang, Kuai
+Yu, Lean Wang, Lecong Zhang, Liang Zhao, Litong Wang, Liyue Zhang, Lei Xu, Leyi Xia, Mingchuan
+Zhang, Minghua Zhang, Minghui Tang, Meng Li, Miaojun Wang, Mingming Li, Ning Tian, Panpan
+Huang, Peng Zhang, Qiancheng Wang, Qinyu Chen, Qiushi Du, Ruiqi Ge, Ruisong Zhang, Ruizhe
+Pan, Runji Wang, R. J. Chen, R. L. Jin, Ruyi Chen, Shanghao Lu, Shangyan Zhou, Shanhuang Chen,
+Shengfeng Ye, Shiyu Wang, Shuiping Yu, Shunfeng Zhou, Shuting Pan, and S. S. Li. DeepSeek-R1:
+incentivizing reasoning capability in llms via reinforcement learning.CoRR, abs/2501.12948, 2025.
+URLhttps://doi.org/10.48550/arXiv.2501.12948.
+Chunjing Gan, Dan Yang, Binbin Hu, Hanxiao Zhang, Siyuan Li, Ziqi Liu, Yue Shen, Lin Ju, Zhiqiang
+Zhang, Jinjie Gu, Lei Liang, and Jun Zhou. Similarity is not all you need: Endowing retrieval augmented
+generation with multi layered thoughts, 2024.
+Chunjing Gan, Dan Yang, Binbin Hu, Ziqi Liu, Yue Shen, Zhiqiang Zhang, Jian Wang, and Jun Zhou.
+Polyrag: Integrating polyviews into retrieval-augmented generation for medical applications.arXiv
+preprint arXiv:2504.14917, 2025.
+YiHan Jiao, ZheHao Tan, Dan Yang, DuoLin Sun, Jie Feng, Yue Shen, Jian Wang, and Peng Wei.
+Hirag: Hierarchical-thought instruction-tuning retrieval-augmented generation.arXiv preprint
+arXiv:2507.05714, 2025.
+Jinhyuk Lee, Zhuyun Dai, Xiaoqi Ren, Blair Chen, Daniel Cer, Jeremy R. Cole, Kai Hui, Michael Boratko,
+Rajvi Kapadia, Wen Ding, Yi Luan, Sai Meher Karthik Duddu, Gustavo Hern´andez ´Abrego, Weiqiang
+Shi, Nithi Gupta, Aditya Kusupati, Prateek Jain, Siddhartha Reddy Jonnalagadda, Ming-Wei Chang,
+and Iftekhar Naim. Gecko: Versatile text embeddings distilled from large language models.CoRR,
+abs/2403.20327, 2024. URLhttps://doi.org/10.48550/arXiv.2403.20327.
+Yibin Lei, Tao Shen, and Andrew Yates. ThinkQE: query expansion via an evolving thinking process.
+CoRR, abs/2506.09260, 2025. URLhttps://doi.org/10.48550/arXiv.2506.09260.
+Jieran Li, Xiuyuan Hu, Yang Zhao, Shengyao Zhuang, and Hao Zhang. Leveraging reference documents
+for zero-shot ranking via large language models.CoRR, abs/2506.11452, 2025. URL https://doi.org/
+10.48550/arXiv.2506.11452.
+Zehan Li, Xin Zhang, Yanzhao Zhang, Dingkun Long, Pengjun Xie, and Meishan Zhang. Towards
+general text embeddings with multi-stage contrastive learning.CoRR, abs/2308.03281, 2023. URL
+https://doi.org/10.48550/arXiv.2308.03281.
+Wenhan Liu, Xinyu Ma, Weiwei Sun, Yutao Zhu, Yuchen Li, Dawei Yin, and Zhicheng Dou. Reasonrank:
+Empowering passage ranking with strong reasoning ability.CoRR, abs/2508.07050, 2025. URL
+https://arxiv.org/abs/2508.07050.
+13
+
+
+--- PAGE 14 ---
+Rui Meng, Ye Liu, Shafiq Rayhan Joty, Caiming Xiong, Yingbo Zhou, and Semih Yavuz. Sfr-embedding-
+mistral:enhance text retrieval with transfer learning. Salesforce AI Research Blog, 2024. URL https:
+//www.salesforce.com/blog/sfr-embedding/.
+Niklas Muennighoff, Nouamane Tazi, Lo¨ıc Magne, and Nils Reimers. MTEB: massive text embedding
+benchmark. InEACL, pp. 2006–2029, 2023.
+Xubo Qin, Jun Bai, Jiaqi Li, Zixia Jia, and Zilong Zheng. Tongsearch-qr: Reinforced query reasoning for
+retrieval.CoRR, abs/2506.11603, 2025. URLhttps://doi.org/10.48550/arXiv.2506.11603.
+Zhen Qin, Rolf Jagerman, Kai Hui, Honglei Zhuang, Junru Wu, Le Yan, Jiaming Shen, Tianqi Liu, Jialu
+Liu, Donald Metzler, Xuanhui Wang, and Michael Bendersky. Large language models are effective text
+rankers with pairwise ranking prompting. InNAACL-HLT (Findings), pp. 1504–1518, 2024.
+Revanth Gangi Reddy, JaeHyeok Doo, Yifei Xu, Md. Arafat Sultan, Deevya Swain, Avirup Sil, and Heng
+Ji. FIRST: faster improved listwise reranking with single token decoding. InEMNLP, pp. 8642–8652.
+Association for Computational Linguistics, 2024.
+Nils Reimers and Iryna Gurevych. Sentence-bert: Sentence embeddings using siamese bert-networks. In
+EMNLP/IJCNLP, pp. 3980–3990. Association for Computational Linguistics, 2019.
+Stephen E. Robertson and Hugo Zaragoza. The probabilistic relevance framework: BM25 and beyond.
+Foundations and T rends in Information Retrieval, 3(4):333–389, 2009.
+Evgenia Rusak, Patrik Reizinger, Attila Juhos, Oliver Bringmann, Roland S. Zimmermann, and Wieland
+Brendel. InfoNCE: Identifying the gap between theory and practice.CoRR, abs/2407.00143, 2024. URL
+https://doi.org/10.48550/arXiv.2407.00143.
+Chris Samarinas and Hamed Zamani. Distillation and refinement of reasoning in small language models
+for document re-ranking.CoRR, abs/2504.03947, 2025. URL https://doi.org/10.48550/arXiv.250
+4.03947.
+Rulin Shao, Rui Qiao, Varsha Kishore, Niklas Muennighoff, Xi Victoria Lin, Daniela Rus, Bryan
+Kian Hsiang Low, Sewon Min, Wen-tau Yih, Pang Wei Koh, and Luke Zettlemoyer. ReasonIR: training
+retrievers for reasoning tasks.CoRR, abs/2504.20595, 2025. URL https://doi.org/10.48550/arXiv
+.2504.20595.
+Hongjin Su, Howard Yen, Mengzhou Xia, Weijia Shi, Niklas Muennighoff, Han-yu Wang, Haisu Liu,
+Quan Shi, Zachary S. Siegel, Michael Tang, Ruoxi Sun, Jinsung Yoon, Sercan ¨O. Arik, Danqi Chen, and
+Tao Yu. BRIGHT: A realistic and challenging benchmark for reasoning-intensive retrieval. InICLR,
+2025.
+Duolin Sun, Meixiu Long, Dan Yang, Yihan Jiao, Zhehao Tan, Jie Feng, Junjie Wang, Yue Shen, Peng
+Wei, Jian Wang, and Jinjie Gu. Grouprank: A groupwise reranking paradigm driven by reinforcement
+learning.CoRR, abs/2511.11653, 2025. URLhttps://arxiv.org/abs/2511.11653.
+Zhehao Tan, Yihan Jiao, Dan Yang, Lei Liu, Jie Feng, Duolin Sun, Yue Shen, Jian Wang, Peng Wei, and Jinjie
+Gu. Prgb benchmark: A robust placeholder-assisted algorithm for benchmarking retrieval-augmented
+generation.arXiv preprint arXiv:2507.22927, 2025.
+Qwen Team. Qwen2.5: A party of foundation models, September 2024. URL https://qwenlm.github.
+io/blog/qwen2.5/.
+Nandan Thakur, Nils Reimers, Andreas R¨uckl´e, Abhishek Srivastava, and Iryna Gurevych. BEIR: A het-
+erogenous benchmark for zero-shot evaluation of information retrieval models.CoRR, abs/2104.08663,
+2021. URLhttps://arxiv.org/abs/2104.08663.
+Cunxiang Wang, Xiaoze Liu, Yuanhao Yue, Xiangru Tang, Tianhang Zhang, Cheng Jiayang, Yunzhi Yao,
+Wenyang Gao, Xuming Hu, Zehan Qi, Yidong Wang, Linyi Yang, Jindong Wang, Xing Xie, Zheng Zhang,
+and Yue Zhang. Survey on factuality in large language models: Knowledge, retrieval and domain-
+specificity.CoRR, abs/2310.07521, 2023. URLhttps://doi.org/10.48550/arXiv.2310.07521.
+Junjie Wang, Mingyang Chen, Binbin Hu, Dan Yang, et al. Learning to plan for retrieval-augmented
+large language models from knowledge graphs. In Yaser Al-Onaizan, Mohit Bansal, and Yun-Nung
+Chen (eds.),Findings of the Association for Computational Linguistics: EMNLP 2024, pp. 7813–7835, Miami,
+Florida, USA, November 2024. Association for Computational Linguistics. doi: 10.18653/v1/2024.findi
+ngs-emnlp.459. URLhttps://aclanthology.org/2024.findings-emnlp.459/.
+14
+
+
+--- PAGE 15 ---
+Orion Weller, Kathryn Ricci, Eugene Yang, Andrew Yates, Dawn J. Lawrie, and Benjamin Van Durme.
+Rank1: Test-time compute for reranking in information retrieval.CoRR, abs/2502.18418, 2025. URL
+https://doi.org/10.48550/arXiv.2502.18418.
+Eugene Yang, Andrew Yates, Kathryn Ricci, Orion Weller, Vivek Chari, Benjamin Van Durme, and
+Dawn J. Lawrie. Rank-k: Test-time reasoning for listwise reranking.CoRR, abs/2505.14432, 2025. URL
+https://doi.org/10.48550/arXiv.2505.14432.
+Le Zhang, Bo Wang, Xipeng Qiu, Siva Reddy, and Aishwarya Agrawal. REARANK: reasoning re-ranking
+agent via reinforcement learning.CoRR, abs/2505.20046, 2025a. URL https://doi.org/10.48550/a
+rXiv.2505.20046.
+Yanzhao Zhang, Mingxin Li, Dingkun Long, Xin Zhang, Huan Lin, Baosong Yang, Pengjun Xie, An Yang,
+Dayiheng Liu, Junyang Lin, Fei Huang, and Jingren Zhou. Qwen3 embedding: Advancing text
+embedding and reranking through foundation models.CoRR, abs/2506.05176, 2025b. URL https:
+//doi.org/10.48550/arXiv.2506.05176.
+Honglei Zhuang, Zhen Qin, Kai Hui, Junru Wu, Le Yan, Xuanhui Wang, and Michael Bendersky. Beyond
+yes and no: Improving zero-shot LLM rankers via scoring fine-grained relevance labels. InNAACL
+(Short Papers), pp. 358–370, 2024.
+Shengyao Zhuang, Xueguang Ma, Bevan Koopman, Jimmy Lin, and Guido Zuccon. Rank-r1: Enhancing
+reasoning in llm-based document rerankers via reinforcement learning.CoRR, abs/2503.06034, 2025.
+URLhttps://doi.org/10.48550/arXiv.2503.06034.
+15

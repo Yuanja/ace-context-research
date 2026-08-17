@@ -26,3 +26,6 @@ The interesting axis is not just compression quality. It is **context governance
 - Whether curation/reflection costs stay favorable when tool calls, storage, and review overhead are included.
 - How systems monitor stale rules, contaminated playbooks, privacy leaks, and benchmark-specific shortcuts.
 
+## BRIGHT Connection
+
+BRIGHT is now tracked as a likely evaluation target for ACE-style context systems. It does not evaluate ACE directly; it evaluates reasoning-intensive retrieval. The useful link is that BRIGHT's top methods increasingly rely on query intent distillation, reasoning-specialized embedding, reranking, fusion, or agentic search. Those are exactly the kinds of strategies an ACE playbook could learn, while ACM/ARC could preserve long retrieval trajectories and exact search evidence.

@@ -16,6 +16,8 @@ Persistent research wiki for Agentic Context Engineering (ACE) and adjacent cont
 
 ## Sources
 
+- [[sources/2407.12883-bright]] - Reasoning-intensive retrieval benchmark.
+- [[sources/bright-leaderboard-top-methods]] - Top BRIGHT leaderboard methods snapshot.
 - [[sources/2510.04618-agentic-context-engineering]] - ACE paper, ICLR 2026.
 - [[sources/2607.23809-agentic-context-management]] - ACM paper, fresh arXiv preprint.
 - [[sources/2607.25066-addressable-recall-compaction]] - ARC paper, fresh arXiv preprint.
@@ -30,8 +32,16 @@ Persistent research wiki for Agentic Context Engineering (ACE) and adjacent cont
 - [[concepts/addressable-recall-compaction]]
 - [[concepts/context-collapse]]
 - [[concepts/evaluation-monitoring-scale]]
+- [[concepts/reasoning-intensive-retrieval]]
+
+## Comparisons
+
+- [[comparisons/bright-vs-ace-context-management]]
+
+## Analyses
+
+- [[analyses/bright-leaderboard-deep-dive-2026-08-16]]
 
 ## Reports
 
 - [Latest interesting items](../reports/latest-interesting.md)
-
