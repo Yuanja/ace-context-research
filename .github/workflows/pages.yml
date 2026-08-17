@@ -1,4 +1,4 @@
-name: Deploy static viewer
+name: Validate static viewer
 
 on:
   push:
@@ -7,18 +7,13 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: viewer-ci
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,10 +22,3 @@ jobs:
           node-version: 24
       - run: node --test tests/viewer-build.test.js
       - run: node tools/build-viewer.js
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-      - id: deployment
-        uses: actions/deploy-pages@v4
-
